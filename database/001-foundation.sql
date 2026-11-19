@@ -7,7 +7,7 @@ CREATE TABLE dbo.RosterBatch (
     Source varchar(16) NOT NULL CHECK (Source IN ('FACTS', 'CSV')),
     ReceivedUtc datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
     Scope nvarchar(100) NOT NULL,
-    RowCount int NOT NULL CHECK (RowCount >= 0),
+    [RowCount] int NOT NULL CHECK ([RowCount] >= 0),
     ValidationStatus varchar(16) NOT NULL CHECK (ValidationStatus IN ('Pending', 'Validated', 'Rejected')),
     IsComplete bit NOT NULL DEFAULT 0
 );
