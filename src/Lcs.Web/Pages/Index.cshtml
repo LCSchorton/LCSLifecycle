@@ -1,22 +1,70 @@
 @page
+@model Lcs.Web.Pages.IndexModel
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LCS Lifecycle Manager</title>
+    <title>Reconciliation | Backpack</title>
     <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header><div class="frame">Lanham Christian School</div></header>
-<main class="frame">
-    <h1>Student and device workspace</h1>
-    <p class="intro">This test workspace is ready for staff sign-in. Student records and device inventory will appear after the school connects its systems.</p>
-    <div class="modules">
-        <section><h2>Student directory</h2><p>Review enrollment and match students to their school accounts.</p><p class="status">Awaiting roster connection</p></section>
-        <section><h2>iPad inventory</h2><p>Find available iPads and review which students have them.</p><p class="status">Awaiting inventory connection</p></section>
-        <section><h2>Student departures</h2><p>Track account closure and what happens to each student’s iPad.</p><p class="status">Workflow pending</p></section>
-    </div>
+<header class="topbar">
+    <div class="frame brand"><strong>Backpack</strong><span>Lanham Christian School</span></div>
+</header>
+<main class="frame reconciliation">
+    <h1>Student and device reconciliation</h1>
+    <p class="intro">Review differences between the student roster, Microsoft accounts, and iPad inventories.</p>
+    <p class="sample-note"><strong>Sample data.</strong> These records are fictional. Live sources are awaiting connection.</p>
+
+    <nav class="summary" aria-label="Reconciliation sections">
+        <a href="#students"><span>Student accounts</span><strong>@Model.StudentReviewCount need review</strong></a>
+        <a href="#devices"><span>iPad inventory</span><strong>@Model.DeviceReviewCount need review</strong></a>
+    </nav>
+
+    <nav class="filters" aria-label="Filter reconciliation results">
+        <a href="?reviewOnly=true" aria-current="@(Model.ReviewOnly ? "page" : null)">Needs review</a>
+        <a href="?reviewOnly=false" aria-current="@(!Model.ReviewOnly ? "page" : null)">All records</a>
+    </nav>
+
+    @{
+        var comparisons = new[]
+        {
+            (Id: "students", Title: "Student accounts", KeyLabel: "School username",
+                Left: "FACTS roster", Right: "Microsoft Entra", Rows: Model.Students),
+            (Id: "devices", Title: "iPad inventory", KeyLabel: "Serial number",
+                Left: "Apple School Manager", Right: "Securly", Rows: Model.Devices)
+        };
+    }
+    @foreach (var comparison in comparisons)
+    {
+        <section class="comparison" id="@comparison.Id" aria-labelledby="@(comparison.Id + "-heading")">
+            <h2 id="@(comparison.Id + "-heading")">@comparison.Title</h2>
+            <div class="table-scroll" role="region" aria-labelledby="@(comparison.Id + "-heading")" tabindex="0">
+                <table aria-labelledby="@(comparison.Id + "-heading")">
+                    <thead>
+                        <tr>
+                            <th scope="col">@comparison.KeyLabel</th>
+                            <th scope="col">@comparison.Left</th>
+                            <th scope="col">@comparison.Right</th>
+                            <th scope="col">Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in comparison.Rows.Where(row => !Model.ReviewOnly || row.NeedsReview))
+                        {
+                            <tr>
+                                <th scope="row">@row.Key</th>
+                                <td>@(row.Left.Count == 0 ? "—" : string.Join("; ", row.Left))</td>
+                                <td>@(row.Right.Count == 0 ? "—" : string.Join("; ", row.Right))</td>
+                                <td><span class="result @(row.NeedsReview ? "review" : "matched")">@row.Result</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
 </main>
 </body>
 </html>
