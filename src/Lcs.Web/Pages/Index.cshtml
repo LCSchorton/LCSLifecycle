@@ -1,22 +1,119 @@
 @page
+@model Lcs.Web.Pages.IndexModel
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LCS Lifecycle Manager</title>
+    <title>Reconciliation | Backpack</title>
     <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header><div class="frame">Lanham Christian School</div></header>
-<main class="frame">
-    <h1>Student and device workspace</h1>
-    <p class="intro">This test workspace is ready for staff sign-in. Student records and device inventory will appear after the school connects its systems.</p>
-    <div class="modules">
-        <section><h2>Student directory</h2><p>Review enrollment and match students to their school accounts.</p><p class="status">Awaiting roster connection</p></section>
-        <section><h2>iPad inventory</h2><p>Find available iPads and review which students have them.</p><p class="status">Awaiting inventory connection</p></section>
-        <section><h2>Student departures</h2><p>Track account closure and what happens to each student’s iPad.</p><p class="status">Workflow pending</p></section>
-    </div>
+<header class="topbar">
+    <div class="frame brand"><strong>Backpack</strong><span>Lanham Christian School</span></div>
+</header>
+<main class="frame reconciliation">
+    <h1>Student and device reconciliation</h1>
+    <p class="intro">Review differences between the student roster, Microsoft accounts, and iPad inventories.</p>
+    @if (User.IsInRole("Lcs.Administrator"))
+    {
+        <details class="upload" open="@(Model.IsUploadPreview ? "open" : null)">
+            <summary>Compare CSV exports</summary>
+            <p>Upload both files for students, iPads, or both. Use complete exports from the same reporting period. Results are for review and apply to these files only.</p>
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div role="alert" class="sample-note">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(entry => entry.Errors))
+                    {
+                        <p>@(string.IsNullOrEmpty(error.ErrorMessage) ? "The upload could not be read. Check the file sizes and try again." : error.ErrorMessage)</p>
+                    }
+                </div>
+            }
+            <form method="post" action="?handler=Preview" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="upload-pairs">
+                    <fieldset>
+                        <legend>Student accounts</legend>
+                        <p>CSV header <code>username,displayName</code></p>
+                        <label>FACTS roster <input type="file" name="facts" accept=".csv"></label>
+                        <label>Microsoft Entra <input type="file" name="entra" accept=".csv"></label>
+                    </fieldset>
+                    <fieldset>
+                        <legend>iPad inventory</legend>
+                        <p>CSV header <code>serial,description</code></p>
+                        <label>Apple School Manager <input type="file" name="apple" accept=".csv"></label>
+                        <label>Securly <input type="file" name="securly" accept=".csv"></label>
+                    </fieldset>
+                </div>
+                <p>Use UTF-8 CSV. Each file can contain up to 3,000 records and be up to 256 KB.</p>
+                <button type="submit">Compare exports</button>
+                @if (Model.IsUploadPreview)
+                {
+                    <a href="/">Back to sample data</a>
+                }
+            </form>
+        </details>
+    }
+    @if (!Model.IsUploadPreview)
+    {
+        <p class="sample-note"><strong>Sample data.</strong> These records are fictional. Live sources are awaiting connection.</p>
+        <nav class="filters" aria-label="Filter reconciliation results">
+            <a href="?reviewOnly=true" aria-current="@(Model.ReviewOnly ? "page" : null)">Needs review</a>
+            <a href="?reviewOnly=false" aria-current="@(!Model.ReviewOnly ? "page" : null)">All records</a>
+        </nav>
+    }
+    @if (Model.Students.Count > 0 || Model.Devices.Count > 0)
+    {
+        <nav class="summary" aria-label="Reconciliation sections">
+            @if (Model.Students.Count > 0)
+            {
+                <a href="#students"><span>Student accounts</span><strong>@Model.StudentReviewCount need review</strong></a>
+            }
+            @if (Model.Devices.Count > 0)
+            {
+                <a href="#devices"><span>iPad inventory</span><strong>@Model.DeviceReviewCount need review</strong></a>
+            }
+        </nav>
+    }
+
+    @{
+        var comparisons = new[]
+        {
+            (Id: "students", Title: "Student accounts", KeyLabel: "School username",
+                Left: "FACTS roster", Right: "Microsoft Entra", Rows: Model.Students),
+            (Id: "devices", Title: "iPad inventory", KeyLabel: "Serial number",
+                Left: "Apple School Manager", Right: "Securly", Rows: Model.Devices)
+        };
+    }
+    @foreach (var comparison in comparisons.Where(comparison => comparison.Rows.Count > 0))
+    {
+        <section class="comparison" id="@comparison.Id" aria-labelledby="@(comparison.Id + "-heading")">
+            <h2 id="@(comparison.Id + "-heading")">@comparison.Title</h2>
+            <div class="table-scroll" role="region" aria-labelledby="@(comparison.Id + "-heading")" tabindex="0">
+                <table aria-labelledby="@(comparison.Id + "-heading")">
+                    <thead>
+                        <tr>
+                            <th scope="col">@comparison.KeyLabel</th>
+                            <th scope="col">@comparison.Left</th>
+                            <th scope="col">@comparison.Right</th>
+                            <th scope="col">Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in comparison.Rows.Where(row => !Model.ReviewOnly || row.NeedsReview))
+                        {
+                            <tr>
+                                <th scope="row">@row.Key</th>
+                                <td>@(row.Left.Count == 0 ? "—" : string.Join("; ", row.Left))</td>
+                                <td>@(row.Right.Count == 0 ? "—" : string.Join("; ", row.Right))</td>
+                                <td><span class="result @(row.NeedsReview ? "review" : "matched")">@row.Result</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
 </main>
 </body>
 </html>
